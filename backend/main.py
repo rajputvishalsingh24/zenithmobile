@@ -59,8 +59,19 @@ app.add_middleware(
 )
 
 
+@app.get("/api")
+def api_root():
+    """API root status endpoint."""
+    return {
+        "status": "online",
+        "app": "Zenith '26 College Fest Management API",
+        "version": "1.0.0",
+        "docs": "/docs",
+    }
+
 
 @app.get("/api/health")
+@app.get("/health")
 def health_check():
     """Health check endpoint to inspect server and database status."""
     ensure_initialized()
@@ -102,6 +113,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 
 @app.get("/api/events", response_model=List[EventOut])
+@app.get("/events", response_model=List[EventOut])
 def list_events(
     category: Optional[str] = Query(default=None, description="Filter by event category"),
     search: Optional[str] = Query(default=None, description="Case-insensitive search by event title"),
@@ -165,6 +177,7 @@ def list_events(
 
 
 @app.get("/api/events/{event_id}", response_model=EventDetail)
+@app.get("/events/{event_id}", response_model=EventDetail)
 def get_event(event_id: int):
     """Return details for a single event by ID, or 404 if not found."""
     conn = get_db_connection()
@@ -216,6 +229,11 @@ def get_event(event_id: int):
 
 @app.post(
     "/api/events/{event_id}/register",
+    response_model=RegistrationOut,
+    status_code=status.HTTP_201_CREATED,
+)
+@app.post(
+    "/events/{event_id}/register",
     response_model=RegistrationOut,
     status_code=status.HTTP_201_CREATED,
 )
@@ -327,6 +345,7 @@ def register_for_event(event_id: int, payload: RegistrationIn):
 
 
 @app.get("/api/registrations", response_model=List[RegistrationRecordOut])
+@app.get("/registrations", response_model=List[RegistrationRecordOut])
 def list_registrations(
     event_id: Optional[int] = Query(default=None, description="Filter registrations by event_id"),
 ):
@@ -375,6 +394,7 @@ def list_registrations(
 
 
 @app.get("/api/stats", response_model=StatsOut)
+@app.get("/stats", response_model=StatsOut)
 def get_stats():
     """
     Compute live dashboard statistics from the database:
@@ -439,6 +459,7 @@ def get_stats():
 # --- Stretch Goal Endpoints ---
 
 @app.post("/api/events", response_model=EventOut, status_code=status.HTTP_201_CREATED)
+@app.post("/events", response_model=EventOut, status_code=status.HTTP_201_CREATED)
 def create_event(payload: EventIn):
     """
     Stretch Goal 1: Allow admins to create a new event with strict server-side validation.
@@ -516,6 +537,7 @@ def create_event(payload: EventIn):
 
 
 @app.delete("/api/registrations/{registration_id}")
+@app.delete("/registrations/{registration_id}")
 def delete_registration(registration_id: int):
     """
     Stretch Goal 2: Allow admins to cancel/delete a registration by ID.
@@ -545,6 +567,6 @@ def delete_registration(registration_id: int):
 
 
 # Mount frontend directory as static files (Step 4)
-# Placed after all /api/* routes so API endpoints always take precedence.
+# Placed after all API routes so endpoints always take precedence over static index.html.
 if FRONTEND_DIR.exists():
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")

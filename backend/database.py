@@ -18,11 +18,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # In serverless environments (Vercel, AWS Lambda), /var/task is read-only.
 # tempfile.gettempdir() (/tmp on Linux) is the only writable directory for temporary SQLite storage.
-IS_SERVERLESS = bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
-if IS_SERVERLESS:
-    DB_PATH = Path(tempfile.gettempdir()) / "fest.db"
-else:
-    DB_PATH = BASE_DIR / "fest.db"
+def _resolve_db_path() -> Path:
+    if os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+        return Path(tempfile.gettempdir()) / "fest.db"
+    try:
+        test_file = BASE_DIR / ".write_test"
+        test_file.touch()
+        test_file.unlink()
+        return BASE_DIR / "fest.db"
+    except (OSError, PermissionError):
+        return Path(tempfile.gettempdir()) / "fest.db"
+
+DB_PATH = _resolve_db_path()
 
 # Unified IntegrityError tuple so `except IntegrityError:` catches both
 if PgIntegrityError:
@@ -147,7 +154,11 @@ def _create_raw_connection():
         return PostgresConnectionWrapper(raw_conn)
 
     # SQLite Fallback
-    conn = sqlite3.connect(DB_PATH)
+    try:
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+    conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn

@@ -18,7 +18,8 @@ except Exception as e:
     err_traceback = traceback.format_exc()
 
     @app.api_route("/{path_name:path}", methods=["GET", "POST", "PUT", "DELETE"])
-    async def diagnostic_fallback(path_name: str):
+    @app.api_route("/", methods=["GET", "POST", "PUT", "DELETE"])
+    async def diagnostic_fallback(path_name: str = ""):
         return JSONResponse(
             status_code=500,
             content={
