@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+*.sqlite3
+fest.db
+
+# Executables & Binaries
+cloudflared.exe
+
+# Android build outputs
+Zenith26/.gradle/
+Zenith26/build/
+Zenith26/*/build/
+Zenith26/local.properties
+.idea/
+*.iml
+
+# Node / Vercel
+.vercel/
+node_modules/
+.env
+.env.local
