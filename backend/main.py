@@ -10,7 +10,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.database import get_db_connection, init_db, IntegrityError
+from backend.database import (
+    get_db_connection,
+    init_db,
+    IntegrityError,
+    ensure_initialized,
+    is_postgres,
+)
 from backend.models import (
     EventDetail,
     EventIn,
@@ -28,9 +34,11 @@ FRONTEND_DIR = BASE_DIR / "frontend"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize SQLite tables and seed initial events on server startup."""
-    init_db()
-    seed_events()
+    """Initialize tables and seed initial events on server startup."""
+    try:
+        ensure_initialized()
+    except Exception as e:
+        print(f"Warning: Lifespan DB init: {e}")
     yield
 
 
@@ -41,7 +49,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Enable CORS for local development
+# Enable CORS for development and cross-origin access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -49,6 +57,32 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+
+@app.get("/api/health")
+def health_check():
+    """Health check endpoint to inspect server and database status."""
+    ensure_initialized()
+    conn = get_db_connection()
+    try:
+        count = conn.execute("SELECT COUNT(*) FROM events;").fetchone()[0]
+        return {
+            "status": "healthy",
+            "database": "postgresql" if is_postgres() else "sqlite",
+            "events_count": count,
+        }
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "unhealthy",
+                "error": str(e),
+                "database": "postgresql" if is_postgres() else "sqlite",
+            },
+        )
+    finally:
+        conn.close()
 
 
 @app.exception_handler(RequestValidationError)

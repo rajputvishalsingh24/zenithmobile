@@ -12,8 +12,17 @@ except ImportError:
     HAS_PSYCOPG2 = False
     PgIntegrityError = None
 
+import tempfile
+
 BASE_DIR = Path(__file__).resolve().parent.parent
-DB_PATH = BASE_DIR / "fest.db"
+
+# In serverless environments (Vercel, AWS Lambda), /var/task is read-only.
+# tempfile.gettempdir() (/tmp on Linux) is the only writable directory for temporary SQLite storage.
+IS_SERVERLESS = bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
+if IS_SERVERLESS:
+    DB_PATH = Path(tempfile.gettempdir()) / "fest.db"
+else:
+    DB_PATH = BASE_DIR / "fest.db"
 
 # Unified IntegrityError tuple so `except IntegrityError:` catches both
 if PgIntegrityError:
@@ -30,6 +39,10 @@ def get_database_url() -> Optional[str]:
             url = val.strip()
             if url.startswith("postgres://"):
                 url = url.replace("postgres://", "postgresql://", 1)
+            # Ensure SSL mode for remote cloud PostgreSQL connections
+            if "@localhost" not in url and "@127.0.0.1" not in url and "sslmode=" not in url:
+                separator = "&" if "?" in url else "?"
+                url = f"{url}{separator}sslmode=require"
             return url
     return None
 
@@ -124,12 +137,8 @@ class PostgresConnectionWrapper:
         self.close()
 
 
-def get_db_connection():
-    """
-    Return a database connection.
-    Connects to PostgreSQL if DATABASE_URL or POSTGRES_URL is configured.
-    Otherwise falls back to SQLite fest.db with Row factory.
-    """
+def _create_raw_connection():
+    """Create a raw database connection without triggering ensure_initialized recursion."""
     db_url = get_database_url()
     if db_url:
         if not HAS_PSYCOPG2:
@@ -137,15 +146,46 @@ def get_db_connection():
         raw_conn = psycopg2.connect(db_url, cursor_factory=psycopg2.extras.DictCursor)
         return PostgresConnectionWrapper(raw_conn)
 
+    # SQLite Fallback
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
 
 
+_initialized = False
+_initializing = False
+
+
+def ensure_initialized() -> None:
+    """Ensure database tables exist and initial seed events are populated."""
+    global _initialized, _initializing
+    if not _initialized and not _initializing:
+        _initializing = True
+        try:
+            init_db()
+            from backend.seed_data import seed_events
+            seed_events()
+            _initialized = True
+        except Exception as e:
+            print(f"Database initialization notice: {e}")
+        finally:
+            _initializing = False
+
+
+def get_db_connection():
+    """
+    Return a database connection.
+    Connects to PostgreSQL if DATABASE_URL or POSTGRES_URL is configured.
+    Otherwise falls back to SQLite fest.db with Row factory.
+    """
+    ensure_initialized()
+    return _create_raw_connection()
+
+
 def init_db() -> None:
     """Create the events and registrations tables if they do not already exist."""
-    conn = get_db_connection()
+    conn = _create_raw_connection()
     try:
         if is_postgres():
             conn.execute(
@@ -213,7 +253,3 @@ def init_db() -> None:
             conn.commit()
     finally:
         conn.close()
-
-
-# Ensure tables exist whenever database module is imported
-init_db()
