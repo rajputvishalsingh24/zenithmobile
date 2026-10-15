@@ -10,11 +10,13 @@ if str(ROOT_DIR) not in sys.path:
 
 try:
     from backend.main import app
+    handler = app
 except Exception as e:
     from fastapi import FastAPI
     from fastapi.responses import JSONResponse
 
     app = FastAPI(title="Zenith '26 - Startup Diagnostic")
+    handler = app
     err_traceback = traceback.format_exc()
 
     @app.api_route("/{path_name:path}", methods=["GET", "POST", "PUT", "DELETE"])
