@@ -1,40 +1,15 @@
 {
-  "rewrites": [
+  "version": 2,
+  "builds": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/index"
-    },
+      "src": "api/index.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
     {
-      "source": "/api",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/docs",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/openapi.json",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/admin",
-      "destination": "/frontend/admin.html"
-    },
-    {
-      "source": "/admin.html",
-      "destination": "/frontend/admin.html"
-    },
-    {
-      "source": "/js/(.*)",
-      "destination": "/frontend/js/$1"
-    },
-    {
-      "source": "/",
-      "destination": "/frontend/index.html"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/frontend/$1"
+      "src": "/(.*)",
+      "dest": "api/index.py"
     }
   ]
 }

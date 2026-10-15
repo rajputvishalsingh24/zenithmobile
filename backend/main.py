@@ -7,7 +7,7 @@ from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Query, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.database import (
@@ -564,6 +564,15 @@ def delete_registration(registration_id: int):
         }
     finally:
         conn.close()
+
+
+@app.get("/admin")
+def admin_page():
+    """Direct route for Admin Dashboard."""
+    admin_path = FRONTEND_DIR / "admin.html"
+    if admin_path.exists():
+        return HTMLResponse(admin_path.read_text(encoding="utf-8"))
+    raise HTTPException(status_code=404, detail="admin.html not found")
 
 
 # Mount frontend directory as static files (Step 4)
